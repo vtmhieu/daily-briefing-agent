@@ -1,0 +1,38 @@
+name: Daily Briefing
+
+on:
+  schedule:
+    # Runs every day at 07:00 UTC. Adjust to your timezone.
+    # 07:00 UTC = 09:00 Stockholm (CEST) / 03:00 EST / 00:00 PST
+    - cron: '0 7 * * *'
+  workflow_dispatch:  # Allow manual trigger from the Actions tab
+
+jobs:
+  send-briefing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Send daily briefing
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL || 'claude-haiku-4-5-20251001' }}
+          EMAIL_PROVIDER: ${{ vars.EMAIL_PROVIDER || 'smtp' }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        run: python briefing_agent.py
