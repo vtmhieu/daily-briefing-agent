@@ -1,18 +1,17 @@
 # Prototype Agent
 
-Turn a GitHub Issue into a live, clickable UI prototype in ~30 seconds — fully automated, completely free.
+Turn a plain-English requirement into a live, clickable UI prototype in ~30 seconds — free, no servers, fully automated.
 
-Write your requirement as a GitHub Issue. The agent reads it, generates a working HTML prototype with Gemini, deploys it to GitHub Pages, and comments back with a live link.
+**Portal:** `https://vtmhieu.github.io/daily-briefing-agent/`
 
 ---
 
 ## How it works
 
 ```
-You open a GitHub Issue
-  "Build me a CRM dashboard for tracking leads"
+You open the portal and type your requirement
           ↓
-GitHub Actions fires automatically
+Portal creates a GitHub Issue automatically
           ↓
 Agent posts: "⏳ Generating your prototype..."
           ↓
@@ -22,11 +21,12 @@ Gemini generates:
           ↓
 HTML deployed to GitHub Pages
           ↓
-Agent updates the comment:
-  "✅ Your prototype is ready → https://you.github.io/repo/prototypes/1/"
+Agent updates the comment with the live link
+          ↓
+Portal detects the result and shows you the link
 ```
 
-Every prototype is also listed on a live index page at the root of your GitHub Pages site.
+Every prototype is listed in the portal under **Past prototypes**.
 
 ---
 
@@ -36,7 +36,7 @@ Everything is free:
 
 | Component | Free tier |
 |---|---|
-| Gemini 2.0 Flash | Free — [Google AI Studio](https://aistudio.google.com) |
+| Gemini 2.0 Flash Lite | Free — [Google AI Studio](https://aistudio.google.com) |
 | GitHub Actions | Free for public repos |
 | GitHub Pages | Free |
 
@@ -48,19 +48,19 @@ Everything is free:
 
 ```bash
 git clone <your-repo-url>
-cd prototype-agent
+cd daily-briefing-agent
 pip install -r requirements.txt
 ```
 
 ### 2. Get a Gemini API key
 
 1. Go to **aistudio.google.com**
-2. Sign in with Google → **Get API key**
-3. Copy it (starts with `AIza...`) — no credit card needed
+2. Sign in with Google → **Get API key** → **Create API key in new project**
+3. Copy the key (starts with `AIza...`) — no credit card needed
 
 ### 3. Add the GitHub secret
 
-In your repo: **Settings → Secrets and variables → Actions → New repository secret**
+**Settings → Secrets and variables → Actions → New repository secret**
 
 | Name | Value |
 |---|---|
@@ -70,32 +70,33 @@ In your repo: **Settings → Secrets and variables → Actions → New repositor
 
 **Settings → Pages → Source: Deploy from a branch → Branch: `gh-pages` → Save**
 
-The branch is created automatically on the first run.
+The `gh-pages` branch is created automatically on the first prototype run.
 
 ### 5. Enable Actions
 
 Go to the **Actions** tab and enable workflows if prompted.
 
+### 6. Deploy the portal
+
+Go to **Actions → Deploy Portal → Run workflow** to push the portal to GitHub Pages for the first time.
+
 ---
 
 ## Usage
 
-Open a GitHub Issue. Title = what you want. Body = details and requirements.
+Open your portal at `https://<your-username>.github.io/<repo-name>/`
 
-**Example:**
+1. **First visit:** paste a GitHub personal access token ([create one here](https://github.com/settings/tokens/new?scopes=public_repo&description=Prototype+Agent) with `public_repo` scope) — saved in your browser, never leaves it
+2. Type a title and optional details for what you want to build
+3. Click **Generate Prototype**
+4. The portal shows a live counter while the agent works (~30s)
+5. When done, click **Open prototype →** to see it in your browser
+
+**Example input:**
 
 > **Title:** Sales pipeline dashboard
 >
-> **Body:**
-> I need a Kanban-style board showing deals by stage: Lead, Proposal, Negotiation, Closed Won.
-> Each card should show company name, deal value, and assigned rep.
-> Include a summary bar at the top showing total value per stage and a win-rate chart.
-
-The agent will comment on your issue within ~30 seconds with:
-- A live link to the prototype
-- A short plan of what was built
-- A link to the raw HTML source
-- A link to the index of all your prototypes
+> **Details:** Kanban board with stages: Lead, Proposal, Negotiation, Closed Won. Cards show company, deal value, assigned rep. Summary bar at top with total value per stage and a win-rate donut chart.
 
 ---
 
@@ -103,31 +104,35 @@ The agent will comment on your issue within ~30 seconds with:
 
 ### Use a smarter model
 
-In your repo, go to **Settings → Variables → Actions** and add:
+In **Settings → Variables → Actions**, add:
 
 | Name | Value |
 |---|---|
-| `GEMINI_MODEL` | `gemini-1.5-pro` or `gemini-2.5-pro` |
+| `GEMINI_MODEL` | `gemini-2.0-flash` or `gemini-1.5-pro` |
 
-### Change the design style or output format
+### Change the design style
 
-Edit `SYSTEM_PROMPT` in `prototype_agent.py`. You can change the design system (e.g. force Material Design, use a specific colour palette), add constraints, or ask for different output (e.g. multi-page apps, data-heavy dashboards).
+Edit `SYSTEM_PROMPT` in `prototype_agent.py` to change the design language, force a specific component library, or add brand constraints.
 
-### Change the prompt structure
+### Change the prompt format
 
-Edit the `generate_prototype` function in `prototype_agent.py` to add more context to what gets sent to Gemini — for example, you could inject a company brand guide or a list of components to use.
+Edit `generate_prototype()` in `prototype_agent.py` to inject additional context into every Gemini call.
 
 ---
 
 ## Project structure
 
 ```
-prototype-agent/
-├── prototype_agent.py                  # Core agent logic
+daily-briefing-agent/
+├── prototype_agent.py                  # Core agent — generates + deploys prototypes
+├── deploy_portal.py                    # Deploys portal/index.html to gh-pages
+├── portal/
+│   └── index.html                      # Web portal UI
 ├── requirements.txt
 ├── .env.example
 ├── .github/workflows/
-│   └── prototype-on-issue.yml          # Triggers on every new Issue
+│   ├── prototype-on-issue.yml          # Triggers on every new GitHub Issue
+│   └── deploy-portal.yml              # Deploys portal on push to main
 └── README.md
 ```
 
