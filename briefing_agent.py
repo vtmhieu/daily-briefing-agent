@@ -1,6 +1,6 @@
 """
 Daily Briefing Agent
-Fetches and summarizes the day's top news across multiple domains using Claude,
+Fetches and summarizes the day's top news across multiple domains using Gemini,
 then emails the briefing to you.
 """
 
@@ -8,7 +8,8 @@ import os
 import sys
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from anthropic import Anthropic
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 from email_sender import send_briefing_email
@@ -16,14 +17,14 @@ from domains import DOMAINS
 
 load_dotenv()
 
-client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-MODEL = os.environ.get("CLAUDE_MODEL", "claude-haiku-4-5-20251001")
+client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
 
 
 def fetch_domain_summary(domain_key: str, domain_config: dict) -> dict:
     """
-    Ask Claude to research and summarize the top stories for one domain.
-    Uses Claude's built-in web_search tool.
+    Ask Gemini to research and summarize the top stories for one domain.
+    Uses Gemini's built-in Google Search grounding tool.
     """
     today = datetime.now().strftime("%A, %B %d, %Y")
 
@@ -44,23 +45,16 @@ should fit in a 5-minute read. No preamble, just the bullets.
     print(f"  Fetching {domain_config['name']}...")
 
     try:
-        response = client.messages.create(
+        response = client.models.generate_content(
             model=MODEL,
-            max_tokens=1500,
-            tools=[{
-                "type": "web_search_20250305",
-                "name": "web_search",
-                "max_uses": 5,
-            }],
-            messages=[{"role": "user", "content": prompt}],
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())],
+                max_output_tokens=1500,
+            ),
         )
 
-        # Extract text from final response (skipping tool-use blocks)
-        text_parts = [
-            block.text for block in response.content
-            if hasattr(block, "text") and block.type == "text"
-        ]
-        summary = "\n".join(text_parts).strip()
+        summary = response.text.strip()
 
         return {
             "key": domain_key,
