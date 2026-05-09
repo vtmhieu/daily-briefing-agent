@@ -1,64 +1,44 @@
-# AI Agent Suite
+# Prototype Agent
 
-Two free, fully automated AI agents that run on GitHub Actions — no servers, no monthly fees.
+Turn a GitHub Issue into a live, clickable UI prototype in ~30 seconds — fully automated, completely free.
 
-Powered by **Gemini 2.0 Flash** (free tier) + **GitHub Pages**.
-
----
-
-## Agent 1: Daily Briefing
-
-Emails you a daily summary of the top news across **Tech & AI**, **Finance & Markets**, **Startups & VC**, and **Crypto** — every morning at 7am UTC.
-
-```
-Cron (7am UTC daily)
-        ↓
-GitHub Actions
-        ↓
-For each domain in parallel:
-  → Gemini searches the web for top stories
-  → Summarizes into bullet points
-        ↓
-HTML email assembled
-        ↓
-Sent via SMTP or SendGrid → your inbox
-```
+Write your requirement as a GitHub Issue. The agent reads it, generates a working HTML prototype with Gemini, deploys it to GitHub Pages, and comments back with a live link.
 
 ---
 
-## Agent 2: Prompt-to-Prototype
-
-Open a GitHub Issue describing a UI requirement. The agent generates a working HTML prototype and deploys it to GitHub Pages — all automatically.
+## How it works
 
 ```
 You open a GitHub Issue
   "Build me a CRM dashboard for tracking leads"
-        ↓
-GitHub Actions fires
-        ↓
+          ↓
+GitHub Actions fires automatically
+          ↓
+Agent posts: "⏳ Generating your prototype..."
+          ↓
 Gemini generates:
   → A 3-5 bullet plan/spec
-  → A complete single-file HTML prototype
-        ↓
-HTML committed to gh-pages branch
-        ↓
-Bot comments on your issue with the live URL
-        ↓
-https://your-username.github.io/repo/prototypes/1/
+  → A complete, single-file HTML prototype
+          ↓
+HTML deployed to GitHub Pages
+          ↓
+Agent updates the comment:
+  "✅ Your prototype is ready → https://you.github.io/repo/prototypes/1/"
 ```
+
+Every prototype is also listed on a live index page at the root of your GitHub Pages site.
 
 ---
 
 ## Cost
 
-Everything here is **free**:
+Everything is free:
 
 | Component | Free tier |
 |---|---|
-| Gemini 2.0 Flash | Free via Google AI Studio |
+| Gemini 2.0 Flash | Free — [Google AI Studio](https://aistudio.google.com) |
 | GitHub Actions | Free for public repos |
 | GitHub Pages | Free |
-| SMTP via Gmail | Free with App Password |
 
 ---
 
@@ -68,7 +48,7 @@ Everything here is **free**:
 
 ```bash
 git clone <your-repo-url>
-cd daily-briefing-agent
+cd prototype-agent
 pip install -r requirements.txt
 ```
 
@@ -76,110 +56,78 @@ pip install -r requirements.txt
 
 1. Go to **aistudio.google.com**
 2. Sign in with Google → **Get API key**
-3. Copy it — starts with `AIza...`
+3. Copy it (starts with `AIza...`) — no credit card needed
 
-No credit card required.
+### 3. Add the GitHub secret
 
-### 3. Set up environment (for local runs)
+In your repo: **Settings → Secrets and variables → Actions → New repository secret**
 
-```bash
-cp .env.example .env
-# Fill in GEMINI_API_KEY + email settings
-```
-
-### 4. Add GitHub secrets
-
-Go to your repo → **Settings → Secrets and variables → Actions** and add:
-
-| Secret | Description |
+| Name | Value |
 |---|---|
-| `GEMINI_API_KEY` | From Google AI Studio |
-| `EMAIL_FROM` | Sender email address |
-| `EMAIL_TO` | Your email address |
-| `SMTP_HOST` | e.g. `smtp.gmail.com` |
-| `SMTP_PORT` | e.g. `587` |
-| `SMTP_USER` | Your Gmail address |
-| `SMTP_PASSWORD` | Gmail [App Password](https://support.google.com/accounts/answer/185833) |
+| `GEMINI_API_KEY` | Your key from Google AI Studio |
 
-Using SendGrid instead of SMTP? Add `SENDGRID_API_KEY` and set the variable `EMAIL_PROVIDER=sendgrid`.
+### 4. Enable GitHub Pages
 
-### 5. Enable GitHub Pages (for the prototype agent)
+**Settings → Pages → Source: Deploy from a branch → Branch: `gh-pages` → Save**
 
-Go to your repo → **Settings → Pages**:
-- Source: **Deploy from a branch**
-- Branch: **`gh-pages`** / `/ (root)`
-- Save
+The branch is created automatically on the first run.
 
-### 6. Enable Actions
+### 5. Enable Actions
 
 Go to the **Actions** tab and enable workflows if prompted.
 
 ---
 
-## Running
+## Usage
 
-### Daily Briefing — locally
+Open a GitHub Issue. Title = what you want. Body = details and requirements.
 
-```bash
-python briefing_agent.py
-```
-
-You'll receive a briefing email within ~30 seconds.
-
-### Daily Briefing — automated
-
-Runs automatically every day at **7am UTC**. To trigger manually:
-- Actions tab → **Daily Briefing** → **Run workflow**
-
-### Prototype Agent — open an Issue
-
-Write your requirement as a GitHub Issue (title + body). The workflow fires automatically on submission. Example:
+**Example:**
 
 > **Title:** Sales pipeline dashboard
 >
-> **Body:** I need a Kanban-style board showing deals by stage (Lead, Proposal, Negotiation, Closed). Each card should show company name, deal value, and owner. Include a summary bar at the top with totals per stage.
+> **Body:**
+> I need a Kanban-style board showing deals by stage: Lead, Proposal, Negotiation, Closed Won.
+> Each card should show company name, deal value, and assigned rep.
+> Include a summary bar at the top showing total value per stage and a win-rate chart.
 
-The bot will comment back on your issue with a live link in ~30 seconds.
+The agent will comment on your issue within ~30 seconds with:
+- A live link to the prototype
+- A short plan of what was built
+- A link to the raw HTML source
+- A link to the index of all your prototypes
 
 ---
 
 ## Customize
 
-### Change news domains
-
-Edit `domains.py` — add, remove, or reword any domain. The briefing agent picks up changes automatically.
-
-### Change the briefing schedule
-
-Edit the `cron` line in `.github/workflows/daily-briefing.yml`. [Crontab.guru](https://crontab.guru) is helpful.
-
 ### Use a smarter model
 
-Set `GEMINI_MODEL=gemini-1.5-pro` or `gemini-2.5-pro` as a GitHub Actions variable for richer output.
+In your repo, go to **Settings → Variables → Actions** and add:
 
-### Change the briefing format
+| Name | Value |
+|---|---|
+| `GEMINI_MODEL` | `gemini-1.5-pro` or `gemini-2.5-pro` |
 
-Edit the prompt in `briefing_agent.py` inside `fetch_domain_summary`.
+### Change the design style or output format
 
-### Change the prototype style
+Edit `SYSTEM_PROMPT` in `prototype_agent.py`. You can change the design system (e.g. force Material Design, use a specific colour palette), add constraints, or ask for different output (e.g. multi-page apps, data-heavy dashboards).
 
-Edit `SYSTEM_PROMPT` in `prototype_agent.py` to change the design style, output format, or libraries used.
+### Change the prompt structure
+
+Edit the `generate_prototype` function in `prototype_agent.py` to add more context to what gets sent to Gemini — for example, you could inject a company brand guide or a list of components to use.
 
 ---
 
 ## Project structure
 
 ```
-daily-briefing-agent/
-├── briefing_agent.py             # Daily briefing orchestrator
-├── prototype_agent.py            # Prompt-to-prototype generator
-├── domains.py                    # News domain configuration
-├── email_sender.py               # SMTP / SendGrid delivery + HTML rendering
+prototype-agent/
+├── prototype_agent.py                  # Core agent logic
 ├── requirements.txt
 ├── .env.example
 ├── .github/workflows/
-│   ├── daily-briefing.yml        # Cron: runs briefing_agent.py daily
-│   └── prototype-on-issue.yml    # Trigger: runs prototype_agent.py on new issues
+│   └── prototype-on-issue.yml          # Triggers on every new Issue
 └── README.md
 ```
 
