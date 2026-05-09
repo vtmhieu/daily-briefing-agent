@@ -3,6 +3,8 @@ name: Prototype on Issue
 on:
   issues:
     types: [opened]
+  issue_comment:
+    types: [created]
 
 # Required so the script can write to gh-pages and comment on the issue.
 permissions:
@@ -12,6 +14,10 @@ permissions:
 jobs:
   generate-prototype:
     runs-on: ubuntu-latest
+    # Skip bot's own comments and PR comments
+    if: |
+      github.event.sender.login != 'github-actions[bot]' &&
+      (github.event_name == 'issues' || github.event.issue.pull_request == null)
 
     steps:
       - uses: actions/checkout@v4
@@ -31,7 +37,9 @@ jobs:
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.1-flash-lite' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          EVENT_TYPE: ${{ github.event_name }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_BODY: ${{ github.event.issue.body }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
         run: python prototype_agent.py

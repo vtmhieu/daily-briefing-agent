@@ -26,7 +26,7 @@ Agent updates the comment with the live link
 Portal detects the result and shows you the link
 ```
 
-Every prototype is listed in the portal under **Past prototypes**.
+Every prototype is listed in the portal under **Past prototypes**, where you can also update them.
 
 ---
 
@@ -91,6 +91,10 @@ Open your portal at `https://<your-username>.github.io/<repo-name>/`
 3. Click **Generate Prototype**
 4. The portal shows a live counter while the agent works (~30s)
 5. When done, click **Open prototype →** to see it in your browser
+
+**Updating a prototype:**
+
+Click **Update** next to any past prototype, describe what you want to change, and click **Apply update**. The agent overwrites the same URL with the new version in ~30 seconds.
 
 **Example input:**
 

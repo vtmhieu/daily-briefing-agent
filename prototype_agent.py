@@ -1,10 +1,12 @@
 """
 Prototype Agent
-Reads a GitHub Issue title + body, asks Gemini to generate a plan and a
-complete single-file HTML prototype, commits the HTML to the gh-pages branch,
-updates the prototype index page, and comments on the issue with the live URL.
+Reads a GitHub Issue (or a comment on one) and asks Gemini to generate or
+update a complete single-file HTML prototype, commits it to gh-pages, and
+comments back with the live URL.
 
 Triggered by: .github/workflows/prototype-on-issue.yml
+  - issues: types: [opened]      → new prototype
+  - issue_comment: types: [created] → update existing prototype
 """
 
 import os
@@ -26,6 +28,10 @@ GITHUB_REPOSITORY = os.environ["GITHUB_REPOSITORY"]
 ISSUE_NUMBER = os.environ["ISSUE_NUMBER"]
 ISSUE_TITLE = os.environ["ISSUE_TITLE"]
 ISSUE_BODY = os.environ.get("ISSUE_BODY", "").strip() or "(No description provided.)"
+EVENT_TYPE = os.environ.get("EVENT_TYPE", "issues")   # "issues" or "issue_comment"
+COMMENT_BODY = os.environ.get("COMMENT_BODY", "").strip()
+
+IS_UPDATE = EVENT_TYPE == "issue_comment"
 
 GH_HEADERS = {
     "Authorization": f"Bearer {GITHUB_TOKEN}",
@@ -77,7 +83,6 @@ def ensure_gh_pages_branch():
     if r.status_code == 200:
         return
 
-    # Branch from main
     r = requests.get(
         f"https://api.github.com/repos/{GITHUB_REPOSITORY}/git/ref/heads/main",
         headers=GH_HEADERS,
@@ -95,7 +100,6 @@ def ensure_gh_pages_branch():
 
 
 def get_file_sha(path: str) -> str | None:
-    """Return the blob SHA of a file on gh-pages (needed to update it)."""
     r = requests.get(
         f"https://api.github.com/repos/{GITHUB_REPOSITORY}/contents/{path}",
         headers=GH_HEADERS,
@@ -105,7 +109,6 @@ def get_file_sha(path: str) -> str | None:
 
 
 def get_file_content(path: str) -> str | None:
-    """Return the decoded content of a file on gh-pages."""
     r = requests.get(
         f"https://api.github.com/repos/{GITHUB_REPOSITORY}/contents/{path}",
         headers=GH_HEADERS,
@@ -117,7 +120,6 @@ def get_file_content(path: str) -> str | None:
 
 
 def commit_file(path: str, content: str, message: str):
-    """Create or update a file on the gh-pages branch."""
     payload = {
         "message": message,
         "content": base64.b64encode(content.encode()).decode(),
@@ -147,7 +149,6 @@ def post_comment(body: str) -> int:
 
 
 def update_comment(comment_id: int, body: str):
-    """Edit an existing comment."""
     r = requests.patch(
         f"https://api.github.com/repos/{GITHUB_REPOSITORY}/issues/comments/{comment_id}",
         headers=GH_HEADERS,
@@ -162,17 +163,15 @@ def pages_base_url() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Index page
+# Registry
 # ---------------------------------------------------------------------------
 
-def update_index(issue_number: str, issue_title: str):
-    """Add the new prototype to registry.json. The portal reads this to list prototypes."""
+def update_registry(issue_number: str, issue_title: str):
+    """Add or update this prototype in registry.json."""
     registry_path = "prototypes/registry.json"
-
     raw = get_file_content(registry_path)
     registry = json.loads(raw) if raw else {}
     registry[issue_number] = issue_title
-
     commit_file(
         registry_path,
         json.dumps(registry, indent=2, ensure_ascii=False),
@@ -185,15 +184,23 @@ def update_index(issue_number: str, issue_title: str):
 # Gemini
 # ---------------------------------------------------------------------------
 
-def generate_prototype(title: str, body: str) -> tuple[str, str]:
+def generate_prototype(title: str, body: str, update_request: str = "") -> tuple[str, str]:
     """Call Gemini and return (plan, html)."""
     print(f"  Calling Gemini ({MODEL})...")
 
-    prompt = (
-        f"Requirement title: {title}\n\n"
-        f"Requirement details:\n{body}\n\n"
-        "Generate the plan and prototype now."
-    )
+    if update_request:
+        prompt = (
+            f"Original requirement title: {title}\n\n"
+            f"Original requirement details:\n{body}\n\n"
+            f"The user wants to update the prototype with these changes:\n{update_request}\n\n"
+            "Generate an updated plan and a fully updated prototype that incorporates the requested changes."
+        )
+    else:
+        prompt = (
+            f"Requirement title: {title}\n\n"
+            f"Requirement details:\n{body}\n\n"
+            "Generate the plan and prototype now."
+        )
 
     response = client.models.generate_content(
         model=MODEL,
@@ -205,7 +212,6 @@ def generate_prototype(title: str, body: str) -> tuple[str, str]:
     )
 
     text = response.text
-
     plan_match = re.search(r"<plan>(.*?)</plan>", text, re.DOTALL)
     proto_match = re.search(r"<prototype>(.*?)</prototype>", text, re.DOTALL)
 
@@ -222,51 +228,54 @@ def generate_prototype(title: str, body: str) -> tuple[str, str]:
 # ---------------------------------------------------------------------------
 
 def main():
-    print(f"Prototype Agent — issue #{ISSUE_NUMBER}: {ISSUE_TITLE}")
+    action = "Updating" if IS_UPDATE else "Generating"
+    print(f"Prototype Agent — {action} prototype for issue #{ISSUE_NUMBER}: {ISSUE_TITLE}")
     print("=" * 60)
 
-    # Post an instant "working" comment so the user knows the agent is running
-    working_comment_id = post_comment(
+    working_msg = (
+        "⏳ **Updating your prototype...** hang tight, usually takes ~30 seconds."
+        if IS_UPDATE else
         "⏳ **Generating your prototype...** hang tight, usually takes ~30 seconds."
     )
+    working_comment_id = post_comment(working_msg)
 
     try:
-        # Ensure gh-pages branch exists
         ensure_gh_pages_branch()
 
-        # Generate plan + HTML via Gemini
-        plan, html = generate_prototype(ISSUE_TITLE, ISSUE_BODY)
+        plan, html = generate_prototype(
+            ISSUE_TITLE,
+            ISSUE_BODY,
+            update_request=COMMENT_BODY if IS_UPDATE else "",
+        )
         print("  Prototype generated.")
 
-        # Commit the prototype HTML
         file_path = f"prototypes/{ISSUE_NUMBER}/index.html"
-        commit_file(
-            file_path,
-            html,
-            f"feat: prototype for issue #{ISSUE_NUMBER} — {ISSUE_TITLE}",
+        commit_msg = (
+            f"fix: update prototype for issue #{ISSUE_NUMBER} — {ISSUE_TITLE}"
+            if IS_UPDATE else
+            f"feat: prototype for issue #{ISSUE_NUMBER} — {ISSUE_TITLE}"
         )
+        commit_file(file_path, html, commit_msg)
         print(f"  Committed {file_path} to gh-pages.")
 
-        # Rebuild the index page
-        update_index(ISSUE_NUMBER, ISSUE_TITLE)
+        # Only update the registry on first creation
+        if not IS_UPDATE:
+            update_registry(ISSUE_NUMBER, ISSUE_TITLE)
 
-        # Build URLs
         base = pages_base_url()
         live_url = f"{base}/prototypes/{ISSUE_NUMBER}/"
         index_url = f"{base}/"
-        source_url = (
-            f"https://github.com/{GITHUB_REPOSITORY}/blob/gh-pages/{file_path}"
-        )
+        source_url = f"https://github.com/{GITHUB_REPOSITORY}/blob/gh-pages/{file_path}"
 
-        # Replace the working comment with the final result
+        heading = "✅ Prototype updated" if IS_UPDATE else "✅ Your prototype is ready"
+        note = "" if IS_UPDATE else "\n> If this is the first run, GitHub Pages may take 1–2 minutes to go live after being enabled in repo Settings.\n"
+
         update_comment(
             working_comment_id,
-            f"""## ✅ Your prototype is ready
+            f"""## {heading}
 
 **[Open prototype →]({live_url})**
-
-> If this is the first run, GitHub Pages may take 1–2 minutes to go live after being enabled in repo Settings.
-
+{note}
 ### Plan
 {plan}
 
@@ -277,7 +286,6 @@ def main():
         print(f"\nDone. Live at: {live_url}")
 
     except Exception as e:
-        # Update the comment to show the error instead of leaving it hanging
         update_comment(
             working_comment_id,
             f"## ❌ Generation failed\n\n```\n{e}\n```\n\nCheck the [Actions log](https://github.com/{GITHUB_REPOSITORY}/actions) for details.",
