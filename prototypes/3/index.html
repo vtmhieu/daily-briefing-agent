@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SalesPipeline CRM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans" x-data="crmData()">
+    
+    <div class="min-h-screen p-4 md:p-8">
+        <!-- Header -->
+        <header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight">Sales Pipeline</h1>
+                <p class="text-slate-500">Manage your leads and track performance.</p>
+            </div>
+            <button class="bg-black text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 transition">
+                + New Lead
+            </button>
+        </header>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+            <template x-for="stage in stages" :key="stage">
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <p class="text-xs text-slate-500 uppercase font-semibold tracking-wider" x-text="stage"></p>
+                    <p class="text-xl font-bold mt-1" x-text="formatCurrency(calculateValue(stage))"></p>
+                </div>
+            </template>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Kanban Board -->
+            <div class="lg:col-span-2 space-y-4">
+                <h2 class="text-lg font-semibold">Pipeline Board</h2>
+                <div class="flex gap-4 overflow-x-auto pb-4">
+                    <template x-for="stage in stages" :key="stage">
+                        <div class="w-64 flex-shrink-0">
+                            <div class="text-xs font-bold text-slate-400 mb-2 uppercase" x-text="stage"></div>
+                            <div class="space-y-2">
+                                <template x-for="lead in leads.filter(l => l.status === stage)" :key="lead.id">
+                                    <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm cursor-grab hover:border-indigo-500 transition">
+                                        <div class="font-medium text-sm" x-text="lead.company"></div>
+                                        <div class="text-xs text-slate-500" x-text="lead.contact"></div>
+                                        <div class="mt-2 font-semibold text-indigo-600 text-sm" x-text="formatCurrency(lead.value)"></div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Win Rate Chart -->
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                <h2 class="text-lg font-semibold mb-4">Win Rate Analytics</h2>
+                <canvas id="winRateChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Leads Table -->
+        <div class="mt-8 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+                <h2 class="font-semibold">All Leads</h2>
+                <input type="text" x-model="search" placeholder="Search leads..." class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="text-xs text-slate-500 uppercase bg-slate-50">
+                        <tr>
+                            <th class="px-6 py-3">Company</th>
+                            <th class="px-6 py-3">Contact</th>
+                            <th class="px-6 py-3">Value</th>
+                            <th class="px-6 py-3">Rep</th>
+                            <th class="px-6 py-3">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <template x-for="lead in filteredLeads" :key="lead.id">
+                            <tr class="hover:bg-slate-50">
+                                <td class="px-6 py-4 font-medium" x-text="lead.company"></td>
+                                <td class="px-6 py-4" x-text="lead.contact"></td>
+                                <td class="px-6 py-4" x-text="formatCurrency(lead.value)"></td>
+                                <td class="px-6 py-4" x-text="lead.rep"></td>
+                                <td class="px-6 py-4">
+                                    <span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase" 
+                                          :class="{'bg-blue-100 text-blue-700': lead.status === 'New', 'bg-emerald-100 text-emerald-700': lead.status === 'Closed Won', 'bg-rose-100 text-rose-700': lead.status === 'Closed Lost'}"
+                                          x-text="lead.status"></span>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function crmData() {
+            return {
+                search: '',
+                stages: ['New', 'Contacted', 'Qualified', 'Closed Won', 'Closed Lost'],
+                leads: [
+                    { id: 1, company: 'Acme Corp', contact: 'John Doe', value: 50000, rep: 'Alice', status: 'Qualified' },
+                    { id: 2, company: 'Globex', contact: 'Jane Smith', value: 12000, rep: 'Bob', status: 'New' },
+                    { id: 3, company: 'Soylent', contact: 'Frank West', value: 85000, rep: 'Alice', status: 'Closed Won' },
+                    { id: 4, company: 'Initech', contact: 'Peter Gibbons', value: 3000, rep: 'Charlie', status: 'Closed Lost' },
+                    { id: 5, company: 'Umbrella', contact: 'Albert Wesker', value: 95000, rep: 'Bob', status: 'Contacted' },
+                ],
+                get filteredLeads() {
+                    return this.leads.filter(l => l.company.toLowerCase().includes(this.search.toLowerCase()));
+                },
+                calculateValue(stage) {
+                    return this.leads.filter(l => l.status === stage).reduce((sum, l) => sum + l.value, 0);
+                },
+                formatCurrency(val) {
+                    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
+                },
+                init() {
+                    new Chart(document.getElementById('winRateChart'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Won', 'Lost', 'In Progress'],
+                            datasets: [{
+                                data: [1, 1, 3],
+                                backgroundColor: ['#10b981', '#f43f5e', '#6366f1']
+                            }]
+                        },
+                        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+</html>
