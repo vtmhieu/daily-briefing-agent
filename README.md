@@ -1,26 +1,68 @@
-# 📰 Daily Briefing Agent
+# AI Agent Suite
 
-An AI agent that emails you a daily summary of the top news in **Tech & AI**, **Finance & Markets**, **Startups & VC**, and **Crypto** — fully automated via GitHub Actions.
+Two free, fully automated AI agents that run on GitHub Actions — no servers, no monthly fees.
 
-Powered by Claude with web search.
+Powered by **Gemini 2.0 Flash** (free tier) + **GitHub Pages**.
 
-## How it works
+---
+
+## Agent 1: Daily Briefing
+
+Emails you a daily summary of the top news across **Tech & AI**, **Finance & Markets**, **Startups & VC**, and **Crypto** — every morning at 7am UTC.
 
 ```
 Cron (7am UTC daily)
         ↓
-GitHub Actions runner
+GitHub Actions
         ↓
 For each domain in parallel:
-  → Claude searches the web for top stories
-  → Claude summarizes into bullet points
+  → Gemini searches the web for top stories
+  → Summarizes into bullet points
         ↓
 HTML email assembled
         ↓
 Sent via SMTP or SendGrid → your inbox
 ```
 
-## Quick start
+---
+
+## Agent 2: Prompt-to-Prototype
+
+Open a GitHub Issue describing a UI requirement. The agent generates a working HTML prototype and deploys it to GitHub Pages — all automatically.
+
+```
+You open a GitHub Issue
+  "Build me a CRM dashboard for tracking leads"
+        ↓
+GitHub Actions fires
+        ↓
+Gemini generates:
+  → A 3-5 bullet plan/spec
+  → A complete single-file HTML prototype
+        ↓
+HTML committed to gh-pages branch
+        ↓
+Bot comments on your issue with the live URL
+        ↓
+https://your-username.github.io/repo/prototypes/1/
+```
+
+---
+
+## Cost
+
+Everything here is **free**:
+
+| Component | Free tier |
+|---|---|
+| Gemini 2.0 Flash | Free via Google AI Studio |
+| GitHub Actions | Free for public repos |
+| GitHub Pages | Free |
+| SMTP via Gmail | Free with App Password |
+
+---
+
+## Setup
 
 ### 1. Clone and install
 
@@ -30,77 +72,118 @@ cd daily-briefing-agent
 pip install -r requirements.txt
 ```
 
-### 2. Set up environment
+### 2. Get a Gemini API key
+
+1. Go to **aistudio.google.com**
+2. Sign in with Google → **Get API key**
+3. Copy it — starts with `AIza...`
+
+No credit card required.
+
+### 3. Set up environment (for local runs)
 
 ```bash
 cp .env.example .env
-# Then edit .env and fill in your keys
+# Fill in GEMINI_API_KEY + email settings
 ```
 
-You'll need:
-- An **Anthropic API key** — get one at https://console.anthropic.com
-- An **email provider**:
-  - **SMTP option (free, easy)**: Gmail with an [App Password](https://support.google.com/accounts/answer/185833)
-  - **SendGrid option (more reliable)**: A free SendGrid account (100 emails/day free tier)
+### 4. Add GitHub secrets
 
-### 3. Test it locally
+Go to your repo → **Settings → Secrets and variables → Actions** and add:
+
+| Secret | Description |
+|---|---|
+| `GEMINI_API_KEY` | From Google AI Studio |
+| `EMAIL_FROM` | Sender email address |
+| `EMAIL_TO` | Your email address |
+| `SMTP_HOST` | e.g. `smtp.gmail.com` |
+| `SMTP_PORT` | e.g. `587` |
+| `SMTP_USER` | Your Gmail address |
+| `SMTP_PASSWORD` | Gmail [App Password](https://support.google.com/accounts/answer/185833) |
+
+Using SendGrid instead of SMTP? Add `SENDGRID_API_KEY` and set the variable `EMAIL_PROVIDER=sendgrid`.
+
+### 5. Enable GitHub Pages (for the prototype agent)
+
+Go to your repo → **Settings → Pages**:
+- Source: **Deploy from a branch**
+- Branch: **`gh-pages`** / `/ (root)`
+- Save
+
+### 6. Enable Actions
+
+Go to the **Actions** tab and enable workflows if prompted.
+
+---
+
+## Running
+
+### Daily Briefing — locally
 
 ```bash
 python briefing_agent.py
 ```
 
-You should receive a briefing email within ~60 seconds.
+You'll receive a briefing email within ~30 seconds.
 
-### 4. Deploy as a daily cron via GitHub Actions
+### Daily Briefing — automated
 
-1. Push this repo to GitHub
-2. Go to **Settings → Secrets and variables → Actions**
-3. Add these **secrets**:
-   - `ANTHROPIC_API_KEY`
-   - `EMAIL_FROM`, `EMAIL_TO`
-   - For SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`
-   - For SendGrid: `SENDGRID_API_KEY`
-4. (Optional) Add **variables**: `CLAUDE_MODEL`, `EMAIL_PROVIDER`
-5. Go to the **Actions** tab and enable workflows
-6. Trigger a test run with **"Run workflow"** on the *Daily Briefing* job
+Runs automatically every day at **7am UTC**. To trigger manually:
+- Actions tab → **Daily Briefing** → **Run workflow**
 
-That's it — the briefing will arrive in your inbox every day at 7am UTC.
+### Prototype Agent — open an Issue
 
-## Cost
+Write your requirement as a GitHub Issue (title + body). The workflow fires automatically on submission. Example:
 
-Using **Claude Haiku 4.5** (the default), one daily run costs roughly **$0.05–0.15**. That's about **$2–5/month**. GitHub Actions is free for public repos and has a generous free tier for private ones.
+> **Title:** Sales pipeline dashboard
+>
+> **Body:** I need a Kanban-style board showing deals by stage (Lead, Proposal, Negotiation, Closed). Each card should show company name, deal value, and owner. Include a summary bar at the top with totals per stage.
+
+The bot will comment back on your issue with a live link in ~30 seconds.
+
+---
 
 ## Customize
 
-### Change domains
+### Change news domains
 
-Edit `domains.py` — add, remove, or reword any domain. The agent will pick up the changes automatically.
+Edit `domains.py` — add, remove, or reword any domain. The briefing agent picks up changes automatically.
 
-### Change the schedule
+### Change the briefing schedule
 
 Edit the `cron` line in `.github/workflows/daily-briefing.yml`. [Crontab.guru](https://crontab.guru) is helpful.
 
 ### Use a smarter model
 
-Set `CLAUDE_MODEL=claude-sonnet-4-6` in your environment for richer summaries (~3× cost).
+Set `GEMINI_MODEL=gemini-1.5-pro` or `gemini-2.5-pro` as a GitHub Actions variable for richer output.
 
-### Change format / depth
+### Change the briefing format
 
-Edit the prompt in `briefing_agent.py` (the `prompt` variable inside `fetch_domain_summary`).
+Edit the prompt in `briefing_agent.py` inside `fetch_domain_summary`.
+
+### Change the prototype style
+
+Edit `SYSTEM_PROMPT` in `prototype_agent.py` to change the design style, output format, or libraries used.
+
+---
 
 ## Project structure
 
 ```
 daily-briefing-agent/
-├── briefing_agent.py        # Main orchestrator
-├── domains.py               # Domain configuration
-├── email_sender.py          # SMTP / SendGrid delivery + HTML rendering
+├── briefing_agent.py             # Daily briefing orchestrator
+├── prototype_agent.py            # Prompt-to-prototype generator
+├── domains.py                    # News domain configuration
+├── email_sender.py               # SMTP / SendGrid delivery + HTML rendering
 ├── requirements.txt
 ├── .env.example
 ├── .github/workflows/
-│   └── daily-briefing.yml   # GitHub Actions cron job
+│   ├── daily-briefing.yml        # Cron: runs briefing_agent.py daily
+│   └── prototype-on-issue.yml    # Trigger: runs prototype_agent.py on new issues
 └── README.md
 ```
+
+---
 
 ## License
 
